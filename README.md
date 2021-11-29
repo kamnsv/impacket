@@ -43,6 +43,8 @@ Grab the latest stable release, unpack it and run `python3 -m pip install .` (`p
 Installing
 ----------
 
+`python3 setup.py install`
+
 In order to install the source execute the following command from the
 directory where the Impacket's distribution has been unpacked: `python3 -m pip install .` (`python2 -m pip install . `for Python 2.x).
 This will install the classes into the default
