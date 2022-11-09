@@ -91,7 +91,11 @@ class RemoteOperations:
         # Let's check its status
         ans = scmr.hRQueryServiceStatus(self.__scmr, self.__serviceHandle)
         if ans['lpServiceStatus']['dwCurrentState'] == scmr.SERVICE_STOPPED:
+<<<<<<< HEAD
             logging.info('Service %s is in stopped state' % self.__serviceName)
+=======
+            #logging.info('Service %s is in stopped state' % self.__serviceName)
+>>>>>>> 83a581e4ba0cb3b7ba5dfa3018b87f9bf1a2cb58
             self.__shouldStop = True
             self.__started = False
         elif ans['lpServiceStatus']['dwCurrentState'] == scmr.SERVICE_RUNNING:
@@ -108,7 +112,11 @@ class RemoteOperations:
                 logging.info('Service %s is disabled, enabling it' % self.__serviceName)
                 self.__disabled = True
                 scmr.hRChangeServiceConfigW(self.__scmr, self.__serviceHandle, dwStartType=0x3)
+<<<<<<< HEAD
             logging.info('Starting service %s' % self.__serviceName)
+=======
+            #logging.info('Starting service %s' % self.__serviceName)
+>>>>>>> 83a581e4ba0cb3b7ba5dfa3018b87f9bf1a2cb58
             scmr.hRStartServiceW(self.__scmr, self.__serviceHandle)
             time.sleep(1)
 
@@ -120,7 +128,11 @@ class RemoteOperations:
     def __restore(self):
         # First of all stop the service if it was originally stopped
         if self.__shouldStop is True:
+<<<<<<< HEAD
             logging.info('Stopping service %s' % self.__serviceName)
+=======
+            #logging.info('Stopping service %s' % self.__serviceName)
+>>>>>>> 83a581e4ba0cb3b7ba5dfa3018b87f9bf1a2cb58
             scmr.hRControlService(self.__scmr, self.__serviceHandle, scmr.SERVICE_CONTROL_STOP)
         if self.__disabled is True:
             logging.info('Restoring the disabled state for service %s' % self.__serviceName)
@@ -202,6 +214,7 @@ class RegHandler:
                                    samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
 
         if self.__options.v:
+<<<<<<< HEAD
             print(keyName)
             value = rrp.hBaseRegQueryValue(dce, ans2['phkResult'], self.__options.v)
             print('\t' + self.__options.v + '\t' + self.__regValues.get(value[0], 'KEY_NOT_FOUND') + '\t', str(value[1]))
@@ -213,6 +226,21 @@ class RegHandler:
             self.__print_all_subkeys_and_entries(dce, subKey + '\\', ans2['phkResult'], 0)
         else:
             print(keyName)
+=======
+            #print(keyName)
+            value = rrp.hBaseRegQueryValue(dce, ans2['phkResult'], self.__options.v)
+            print('value', str(value[1]), sep='|')
+            #print('\t' + self.__options.v + '\t' + self.__regValues.get(value[0], 'KEY_NOT_FOUND') + '\t', str(value[1]))
+        elif self.__options.ve:
+            #print(keyName)
+            value = rrp.hBaseRegQueryValue(dce, ans2['phkResult'], '')
+            print('value', str(value[1]), sep='|')
+            #print('\t' + '(Default)' + '\t' + self.__regValues.get(value[0], 'KEY_NOT_FOUND') + '\t', str(value[1]))
+        elif self.__options.s:
+            self.__print_all_subkeys_and_entries(dce, subKey + '\\', ans2['phkResult'], 0)
+        else:
+            #print(keyName)
+>>>>>>> 83a581e4ba0cb3b7ba5dfa3018b87f9bf1a2cb58
             self.__print_key_values(dce, ans2['phkResult'])
             i = 0
             while True:
@@ -490,7 +518,11 @@ if __name__ == '__main__':
     if sys.stdout.encoding is None:
         # Output is redirected to a file
         sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+<<<<<<< HEAD
     print(version.BANNER)
+=======
+   #print(version.BANNER)
+>>>>>>> 83a581e4ba0cb3b7ba5dfa3018b87f9bf1a2cb58
 
     parser = argparse.ArgumentParser(add_help=True, description="Windows Register manipulation script.")
 
@@ -591,7 +623,11 @@ if __name__ == '__main__':
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
+<<<<<<< HEAD
     print = lambda *x, **y: pass
+=======
+        
+>>>>>>> 83a581e4ba0cb3b7ba5dfa3018b87f9bf1a2cb58
     
     options = parser.parse_args()
 
