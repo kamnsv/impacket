@@ -1,10 +1,10 @@
-# Impacket - Collection of Python classes for working with network protocols.
+# SECUREAUTH LABS. Copyright 2018 SecureAuth Corporation. All rights reserved.
 #
-# SECUREAUTH LABS. Copyright (C) 2021 SecureAuth Corporation. All rights reserved.
-#
-# This software is provided under a slightly modified version
+# This software is provided under under a slightly modified version
 # of the Apache Software License. See the accompanying LICENSE file
 # for more information.
+#
+# Author: Alberto Solino (@agsolino)
 #
 # Description:
 #   [MS-WMI]/[MS-WMIO] : Windows Management Instrumentation Remote Protocol. Partial implementation
@@ -13,12 +13,9 @@
 #   so you understand what the call does, and then read the test case located
 #   at https://github.com/SecureAuthCorp/impacket/tree/master/tests/SMB_RPC
 #
-#   Since DCOM is like an OO RPC, instead of helper functions you will see the
-#   classes described in the standards developed.
-#   There are test cases for them too.
-#
-# Author:
-#   Alberto Solino (@agsolino)
+#   Since DCOM is like an OO RPC, instead of helper functions you will see the 
+#   classes described in the standards developed. 
+#   There are test cases for them too. 
 #
 from __future__ import division
 from __future__ import print_function
@@ -26,19 +23,18 @@ from struct import unpack, calcsize, pack
 from functools import partial
 import collections
 import logging
-import six
 
-from impacket.dcerpc.v5.ndr import NDRSTRUCT, NDRUniConformantArray, NDRPOINTER, NDRUniConformantVaryingArray, NDRUNION, \
+from .ndr import NDRSTRUCT, NDRUniConformantArray, NDRPOINTER, NDRUniConformantVaryingArray, NDRUNION, \
     NDRENUM
-from impacket.dcerpc.v5.dcomrt import DCOMCALL, DCOMANSWER, IRemUnknown, PMInterfacePointer, INTERFACE, \
+from .dcomrt import DCOMCALL, DCOMANSWER, IRemUnknown, PMInterfacePointer, INTERFACE, \
     PMInterfacePointer_ARRAY, BYTE_ARRAY, PPMInterfacePointer, OBJREF_CUSTOM
-from impacket.dcerpc.v5.dcom.oaut import BSTR
-from impacket.dcerpc.v5.dtypes import ULONG, DWORD, NULL, LPWSTR, LONG, HRESULT, PGUID, LPCSTR, GUID
-from impacket.dcerpc.v5.enum import Enum
-from impacket.dcerpc.v5.rpcrt import DCERPCException
-from impacket import hresult_errors, LOG
-from impacket.uuid import string_to_bin, uuidtup_to_bin
-from impacket.structure import Structure, hexdump
+from .oaut import BSTR
+from .dtypes import ULONG, DWORD, NULL, LPWSTR, LONG, HRESULT, PGUID, LPCSTR, GUID
+from .enum import Enum
+from .rpcrt import DCERPCException
+from . import hresult_errors, LOG
+from .uuid import string_to_bin, uuidtup_to_bin
+from .structure import Structure, hexdump
 
 
 def format_structure(d, level=0):
@@ -284,15 +280,6 @@ CIM_TYPE_TO_NAME = {
     CIM_TYPE_ENUM.CIM_TYPE_CHAR16.value   : 'char16',
     CIM_TYPE_ENUM.CIM_TYPE_OBJECT.value   : 'object',
 }
-
-CIM_NUMBER_TYPES = (
-    CIM_TYPE_ENUM.CIM_TYPE_CHAR16.value, CIM_TYPE_ENUM.CIM_TYPE_BOOLEAN.value,
-    CIM_TYPE_ENUM.CIM_TYPE_SINT8.value, CIM_TYPE_ENUM.CIM_TYPE_UINT8.value,
-    CIM_TYPE_ENUM.CIM_TYPE_SINT16.value, CIM_TYPE_ENUM.CIM_TYPE_UINT16.value,
-    CIM_TYPE_ENUM.CIM_TYPE_SINT32.value, CIM_TYPE_ENUM.CIM_TYPE_UINT32.value,
-    CIM_TYPE_ENUM.CIM_TYPE_SINT64.value, CIM_TYPE_ENUM.CIM_TYPE_UINT64.value,
-    CIM_TYPE_ENUM.CIM_TYPE_REAL32.value, CIM_TYPE_ENUM.CIM_TYPE_REAL64.value,
-)
 
 # 2.2.61 QualifierName
 QUALIFIER_NAME = HEAP_STRING_REF
@@ -804,24 +791,9 @@ class INSTANCE_TYPE(Structure):
         else:
             self.data = None
 
-    def __processNdTable(self, properties):
-        octetCount = (len(properties) - 1) // 4 + 1  # see [MS-WMIO]: 2.2.26 NdTable
-        packedNdTable = self['NdTable_ValueTable'][:octetCount]
-        unpackedNdTable = [(byte >> shift) & 0b11 for byte in six.iterbytes(packedNdTable) for shift in (0, 2, 4, 6)]
-        for key in properties:
-            ndEntry = unpackedNdTable[properties[key]['order']]
-            properties[key]['null_default'] = bool(ndEntry & 0b01)
-            properties[key]['inherited_default'] = bool(ndEntry & 0b10)
-
-        return octetCount
-
-    @staticmethod
-    def __isNonNullNumber(prop):
-        return prop['type'] & ~Inherited in CIM_NUMBER_TYPES and not prop['null_default']
-
     def getValues(self, properties):
         heap = self["InstanceHeap"]["HeapItem"]
-        valueTableOff = self.__processNdTable(properties)
+        valueTableOff = (len(properties) - 1) // 4 + 1
         valueTable = self['NdTable_ValueTable'][valueTableOff:]
         sorted_props = sorted(list(properties.keys()), key=lambda k: properties[k]['order'])
         for key in sorted_props:
@@ -838,7 +810,7 @@ class INSTANCE_TYPE(Structure):
                 itemValue = 0xffffffff
 
             # if itemValue == 0, default value remains
-            if itemValue != 0 or self.__isNonNullNumber(properties[key]):
+            if itemValue != 0:
                 value = ENCODED_VALUE.getValue( properties[key]['type'], itemValue, heap)
                 properties[key]['value'] = value
             # is the value set valid or should we clear it? ( if not inherited )
@@ -2389,11 +2361,6 @@ class IWbemClassObject(IRemUnknown):
             return ()
         return self.encodingUnit['ObjectBlock'].ctCurrent['methods']
 
-    @staticmethod
-    def __ndEntry(index, null_default, inherited_default):
-        # https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-wmio/ed436785-40fc-425e-ad3d-f9200eb1a122
-        return (bool(null_default) << 1 | bool(inherited_default)) << (2 * index)
-
     def marshalMe(self):
         # So, in theory, we have the OBJCUSTOM built, but 
         # we need to update the values
@@ -2410,7 +2377,6 @@ class IWbemClassObject(IRemUnknown):
         for i, propName in enumerate(properties):
             propRecord = properties[propName]
             itemValue = getattr(self, propName)
-            propIsInherited = propRecord['inherited']
             print("PropName %r, Value: %r" % (propName,itemValue))
 
             pType = propRecord['type'] & (~(CIM_ARRAY_FLAG|Inherited)) 
@@ -2422,7 +2388,7 @@ class IWbemClassObject(IRemUnknown):
 
             if propRecord['type'] & CIM_ARRAY_FLAG:
                 if itemValue is None:
-                    ndTable |= self.__ndEntry(i, True, propIsInherited)
+                    ndTable |= 2 << (2*i)
                     valueTable += pack(packStr, 0)
                 else:
                     valueTable += pack('<L', curHeapPtr)
@@ -2436,34 +2402,33 @@ class IWbemClassObject(IRemUnknown):
             elif pType in (CIM_TYPE_ENUM.CIM_TYPE_UINT8.value, CIM_TYPE_ENUM.CIM_TYPE_UINT16.value,
                            CIM_TYPE_ENUM.CIM_TYPE_UINT32.value, CIM_TYPE_ENUM.CIM_TYPE_UINT64.value):
                 if itemValue is None:
-                    ndTable |= self.__ndEntry(i, True, propIsInherited)
+                    ndTable |= 2 << (2 * i)
                     valueTable += pack(packStr, 0)
                 else:
                     valueTable += pack(packStr, int(itemValue))
             elif pType in (CIM_TYPE_ENUM.CIM_TYPE_BOOLEAN.value,):
                 if itemValue is None:
-                    ndTable |= self.__ndEntry(i, True, propIsInherited)
+                    ndTable |= 2 << (2 * i)
                     valueTable += pack(packStr, False)
                 else:
                     valueTable += pack(packStr, bool(itemValue))
             elif pType not in (CIM_TYPE_ENUM.CIM_TYPE_STRING.value, CIM_TYPE_ENUM.CIM_TYPE_DATETIME.value,
                                CIM_TYPE_ENUM.CIM_TYPE_REFERENCE.value, CIM_TYPE_ENUM.CIM_TYPE_OBJECT.value):
                 if itemValue is None:
-                    ndTable |= self.__ndEntry(i, True, propIsInherited)
+                    ndTable |= 2 << (2 * i)
                     valueTable += pack(packStr, -1)
                 else:
                     valueTable += pack(packStr, itemValue)
             elif pType == CIM_TYPE_ENUM.CIM_TYPE_OBJECT.value:
-                # For now we just pack None and set the inherited_default
-                # flag, just in case a parent class defines this for us
+                # For now we just pack None
                 valueTable += b'\x00'*4
+                # The default property value is NULL, and it is
+                # inherited from a parent class.
                 if itemValue is None:
-                    ndTable |= self.__ndEntry(i, True, True)
+                    ndTable |= 3 << (2*i)
             else:
                 if itemValue == '':
-                    # https://github.com/SecureAuthCorp/impacket/pull/1069#issuecomment-835179409
-                    # Force inherited_default to avoid 'obscure' issue in wmipersist.py
-                    ndTable |= self.__ndEntry(i, True, True)
+                    ndTable |= 2 << (2*i)
                     valueTable += pack('<L', 0)
                 else:
                     strIn = ENCODED_STRING()
@@ -2549,10 +2514,11 @@ class IWbemClassObject(IRemUnknown):
                                    CIM_TYPE_ENUM.CIM_TYPE_REFERENCE.value, CIM_TYPE_ENUM.CIM_TYPE_OBJECT.value):
                     valueTable += pack(packStr, 0)
                 elif pType == CIM_TYPE_ENUM.CIM_TYPE_OBJECT.value:
-                    # For now we just pack None and set the inherited_default
-                    # flag, just in case a parent class defines this for us
+                    # For now we just pack None
                     valueTable += b'\x00'*4
-                    ndTable |= self.__ndEntry(i, True, True)
+                    # The default property value is NULL, and it is 
+                    # inherited from a parent class.
+                    ndTable |= 3 << (2*i)
                 else:
                     strIn = ENCODED_STRING()
                     strIn['Character'] = ''
@@ -2742,10 +2708,11 @@ class IWbemClassObject(IRemUnknown):
                         valueTable += pack(packStr, inArg)
                     elif pType == CIM_TYPE_ENUM.CIM_TYPE_OBJECT.value:
                         if inArg is None:
-                            # For now we just pack None and set the inherited_default
-                            # flag, just in case a parent class defines this for us
+                            # For now we just pack None
                             valueTable += b'\x00' * 4
-                            ndTable |= self.__ndEntry(i, True, True)
+                            # The default property value is NULL, and it is
+                            # inherited from a parent class.
+                            ndTable |= 3 << (2 * i)
                         else:
                             valueTable += pack('<L', curHeapPtr)
                             marshaledObject = inArg.marshalMe()
@@ -3166,25 +3133,25 @@ class IWbemServices(IRemUnknown):
         resp.dump()
         return resp
 
-    def ExecNotificationQuery(self, strQuery, lFlags=0, pCtx=NULL):
+    async def ExecNotificationQuery(self, strQuery, lFlags=0, pCtx=NULL):
         request = IWbemServices_ExecNotificationQuery()
         request['strQueryLanguage']['asData'] = checkNullString('WQL')
         request['strQuery']['asData'] = checkNullString(strQuery)
         request['lFlags'] = lFlags
         request['pCtx'] = pCtx
-        resp = self.request(request, iid = self._iid, uuid = self.get_iPid())
+        resp = await self.request(request, iid = self._iid, uuid = self.get_iPid())
         return IEnumWbemClassObject(
             INTERFACE(self.get_cinstance(), b''.join(resp['ppEnum']['abData']), self.get_ipidRemUnknown(),
                       target=self.get_target()), self)
 
-    def ExecNotificationQueryAsync(self, strQuery, lFlags=0, pCtx=NULL):
+    def ExecNotificationQueryAsync(self, strQuery, sink, lFlags=0, pCtx=NULL):
         request = IWbemServices_ExecNotificationQueryAsync()
         request['strQueryLanguage']['asData'] = checkNullString('WQL')
         request['strQuery']['asData'] = checkNullString(strQuery)
         request['lFlags'] = lFlags
         request['pCtx'] = pCtx
+        request['pResponseHandler'] = sink
         resp = self.request(request, iid = self._iid, uuid = self.get_iPid())
-        resp.dump()
         return resp
 
     def ExecMethod(self, strObjectPath, strMethodName, lFlags=0, pCtx=NULL, pInParams=NULL, ppOutParams = NULL):
@@ -3249,13 +3216,13 @@ class IWbemLevel1Login(IRemUnknown):
         resp = self.request(request, iid = self._iid, uuid = self.get_iPid())
         return resp['reserved5']
 
-    def NTLMLogin(self, wszNetworkResource, wszPreferredLocale, pCtx):
+    async def NTLMLogin(self, wszNetworkResource, wszPreferredLocale, pCtx):
         request = IWbemLevel1Login_NTLMLogin()
         request['wszNetworkResource'] = checkNullString(wszNetworkResource)
         request['wszPreferredLocale'] = checkNullString(wszPreferredLocale)
         request['lFlags'] = 0
         request['pCtx'] = pCtx
-        resp = self.request(request, iid = self._iid, uuid = self.get_iPid())
+        resp = await self.request(request, iid = self._iid, uuid = self.get_iPid())
         return IWbemServices(
             INTERFACE(self.get_cinstance(), b''.join(resp['ppNamespace']['abData']), self.get_ipidRemUnknown(),
                       target=self.get_target()))
@@ -3271,7 +3238,8 @@ if __name__ == '__main__':
     #print "LEN ", len(baseClass), len(encodingUnit)
 
     #myClass = b"xV4\x12.\x02\x00\x00\x05\x00DPRAVAT-DEV\x00\x00ROOT\x00f\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x01\x00\x00\x00\x06\x00\x00\x00\n\x00\x00\x00\x05\xff\xff\xff\xff<\x00\x00\x80\x00Base\x00\x00Id\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\n\x00\x00\x80\x03\x08\x00\x00\x004\x00\x00\x00\x01\x00\x00\x80\x13\x0b\x00\x00\x00\xff\xff\x00sint32\x00\x0c\x00\x00\x00\x00\x004\x00\x00\x00\x00\x80v\x01\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\x0e\x00\x00\x00\x00Base\x00\x06\x00\x00\x00\x11\x00\x00\x00\t\x00\x00\x00\x00\x08\x00\x00\x00\x16\x00\x00\x00\x04\x00\x00\x00'\x00\x00\x00.\x00\x00\x00U\x00\x00\x00\\\x00\x00\x00\x99\x00\x00\x00\xa0\x00\x00\x00\xc7\x00\x00\x00\xcb\x00\x00\x00G\xff\xff\xff\xff\xff\xff\xff\xff\xfd\x00\x00\x00\xff\xff\xff\xff\x11\x01\x00\x80\x00MyClass\x00\x00Description\x00\x00MyClass Example\x00\x00Array\x00\x13 \x00\x00\x03\x00\x0c\x00\x00\x00\x01\x00\x00\x00\x11\x00\x00\x00\n\x00\x00\x80\x03\x08\x00\x00\x00M\x00\x00\x00\x00uint32\x00\x00Data1\x00\x08\x00\x00\x00\x01\x00\x04\x00\x00\x00\x01\x00\x00\x00'\x00\x00\x00\n\x00\x00\x80\x03\x08\x00\x00\x00\x91\x00\x00\x00\x03\x00\x00\x80\x00\x0b\x00\x00\x00\xff\xff\x04\x00\x00\x80\x00\x0b\x00\x00\x00\xff\xff\x00string\x00\x00Data2\x00\x08\x00\x00\x00\x02\x00\x08\x00\x00\x00\x01\x00\x00\x00\x11\x00\x00\x00\n\x00\x00\x80\x03\x08\x00\x00\x00\xbf\x00\x00\x00\x00string\x00\x00Id\x00\x03@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\n\x00\x00\x80#\x08\x00\x00\x00\xf5\x00\x00\x00\x01\x00\x00\x803\x0b\x00\x00\x00\xff\xff\x00sint32\x00\x00defaultValue\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00s\x00\x00\x00\x802\x00\x00defaultValue\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00"
-    #hexdump(myClass)
+    #
+    #(myClass)
     #encodingUnit = ENCODING_UNIT(myClass)
     #print "LEN ", len(myClass), len(encodingUnit)
     #encodingUnit.dump()
